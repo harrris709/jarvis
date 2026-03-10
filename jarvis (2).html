@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>J.A.R.V.I.S</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+:root {
+  --cyan: #00d4ff;
+  --gold: #ffd700;
+  --red: #ff4444;
+  --green: #00ff88;
+  --dark: #020810;
+  --panel: rgba(0,15,40,0.92);
+  --border: rgba(0,212,255,0.22);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{background:var(--dark);color:var(--cyan);font-family:'Share Tech Mono',monospace;min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,212,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,0.03) 1px,transparent 1px);background-size:40px 40px;animation:gridScroll 20s linear infinite;pointer-events:none;z-index:0}
+@keyframes gridScroll{to{background-position:0 40px}}
+.glow-bg{position:fixed;width:900px;height:900px;border-radius:50%;background:radial-gradient(circle,rgba(0,80,200,0.07) 0%,transparent 65%);top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:0;animation:breathe 5s ease-in-out infinite}
+@keyframes breathe{0%,100%{opacity:.5;transform:translate(-50%,-50%) scale(1)}50%{opacity:1;transform:translate(-50%,-50%) scale(1.08)}}
+.screen{display:none;position:relative;z-index:1}
+.screen.active{display:flex;flex-direction:column;min-height:100vh}
+
+/* SETUP */
+#setup{align-items:center;justify-content:center;padding:28px 18px}
+.setup-wrap{width:100%;max-width:460px}
+.hud-logo{text-align:center;margin-bottom:28px}
+.hud-logo h1{font-family:'Orbitron',monospace;font-weight:900;font-size:clamp(28px,9vw,48px);letter-spacing:10px;color:var(--cyan);text-shadow:0 0 20px var(--cyan),0 0 50px rgba(0,212,255,0.4);animation:flicker 6s infinite}
+@keyframes flicker{0%,94%,100%{opacity:1}95%{opacity:.7}97%{opacity:.9}}
+.hud-logo p{font-size:9px;letter-spacing:5px;color:rgba(0,212,255,0.4);margin-top:5px}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px 18px;margin-bottom:14px;position:relative;overflow:hidden}
+.card::after{content:'';position:absolute;top:0;left:-200%;width:60%;height:1px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);animation:sweep 3s linear infinite}
+@keyframes sweep{to{left:200%}}
+.card-title{font-family:'Orbitron',monospace;font-size:10px;letter-spacing:3px;color:var(--gold);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.card-title .dot{width:6px;height:6px;border-radius:50%;background:var(--gold);box-shadow:0 0 8px var(--gold);flex-shrink:0}
+.field{margin-bottom:12px}
+.field:last-child{margin-bottom:0}
+.field label{display:block;font-size:10px;letter-spacing:2px;color:rgba(0,212,255,0.55);margin-bottom:5px}
+.field input{width:100%;background:rgba(0,212,255,0.04);border:1px solid var(--border);border-radius:4px;color:var(--cyan);font-family:'Share Tech Mono',monospace;font-size:12px;padding:10px 12px;outline:none;transition:border-color .2s,box-shadow .2s}
+.field input:focus{border-color:var(--cyan);box-shadow:0 0 14px rgba(0,212,255,0.18)}
+.field input::placeholder{color:rgba(0,212,255,0.2)}
+.hint{font-size:10px;color:rgba(0,212,255,0.35);margin-top:5px;line-height:1.6}
+.hint a{color:rgba(0,212,255,0.6);text-decoration:none}
+.btn{width:100%;padding:14px;background:linear-gradient(135deg,rgba(0,100,255,0.25),rgba(0,212,255,0.1));border:1px solid var(--cyan);border-radius:6px;color:var(--cyan);font-family:'Orbitron',monospace;font-size:12px;font-weight:700;letter-spacing:4px;cursor:pointer;transition:all .2s;display:block;text-align:center}
+.btn:hover,.btn:active{background:linear-gradient(135deg,rgba(0,100,255,0.4),rgba(0,212,255,0.2));box-shadow:0 0 20px rgba(0,212,255,0.3)}
+.btn.sm{font-size:10px;padding:10px;opacity:.6;letter-spacing:2px;margin-top:10px}
+.btn.green{border-color:var(--green);color:var(--green);background:rgba(0,255,136,0.06)}
+.status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.status-dot.ok{background:var(--green);box-shadow:0 0 6px var(--green)}
+.status-dot.err{background:var(--red);box-shadow:0 0 6px var(--red)}
+.status-dot.idle{background:rgba(0,212,255,0.3)}
+
+/* MAIN */
+#main{padding:0}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);background:rgba(2,8,16,0.97);position:sticky;top:0;z-index:100;backdrop-filter:blur(10px)}
+.topbar-title{font-family:'Orbitron',monospace;font-size:14px;font-weight:900;letter-spacing:6px;text-shadow:0 0 15px var(--cyan)}
+.topbar-right{display:flex;gap:10px;align-items:center}
+.stat-pill{font-size:10px;letter-spacing:1px;display:flex;align-items:center}
+.icon-btn{background:transparent;border:1px solid var(--border);border-radius:4px;color:rgba(0,212,255,0.6);font-size:16px;padding:6px 10px;cursor:pointer;transition:all .2s}
+.icon-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+
+/* Spotify bar */
+.sp-bar{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--border);background:rgba(0,10,25,0.5);cursor:pointer}
+.sp-art{width:40px;height:40px;border-radius:4px;background:rgba(0,212,255,0.07);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;background-size:cover;background-position:center}
+.sp-info{flex:1;min-width:0}
+.sp-track{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sp-artist{font-size:10px;color:rgba(0,212,255,0.45);margin-top:2px}
+.sp-btns{display:flex;gap:6px}
+.sp-btn{background:transparent;border:1px solid var(--border);border-radius:50%;width:30px;height:30px;color:rgba(0,212,255,0.7);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0}
+.sp-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+
+/* Quick strip */
+.quick-strip{display:flex;gap:8px;overflow-x:auto;padding:12px 18px;scrollbar-width:none;border-bottom:1px solid var(--border)}
+.quick-strip::-webkit-scrollbar{display:none}
+.qbtn{flex-shrink:0;background:var(--panel);border:1px solid var(--border);border-radius:20px;color:rgba(0,212,255,0.7);font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:1px;padding:7px 14px;cursor:pointer;white-space:nowrap;transition:all .2s}
+.qbtn:hover,.qbtn:active{border-color:var(--cyan);color:var(--cyan);background:rgba(0,212,255,0.08)}
+
+/* Tabs */
+.tabs{display:flex;border-bottom:1px solid var(--border)}
+.tab{font-family:'Orbitron',monospace;font-size:9px;letter-spacing:2px;padding:10px 18px;cursor:pointer;color:rgba(0,212,255,0.4);border-bottom:2px solid transparent;transition:all .2s}
+.tab.active{color:var(--cyan);border-bottom-color:var(--cyan)}
+.tab-body{display:none;padding:14px 18px;padding-bottom:200px}
+.tab-body.active{display:block}
+
+/* Chat */
+.chat-area{display:flex;flex-direction:column;gap:12px}
+.msg{max-width:85%;animation:msgIn .25s ease}
+@keyframes msgIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.msg.j{align-self:flex-start}
+.msg.u{align-self:flex-end}
+.msg-lbl{font-size:9px;letter-spacing:2px;color:rgba(0,212,255,0.4);margin-bottom:4px}
+.msg.u .msg-lbl{text-align:right}
+.bubble{padding:12px 14px;border-radius:6px;font-size:13px;line-height:1.65}
+.msg.j .bubble{background:var(--panel);border:1px solid var(--border);border-left:2px solid var(--cyan)}
+.msg.u .bubble{background:rgba(0,100,255,0.13);border:1px solid rgba(0,100,255,0.28);color:#9ed4ff;text-align:right}
+.typing{display:flex;gap:5px;align-items:center;padding:4px 0}
+.typing span{width:7px;height:7px;border-radius:50%;background:var(--cyan);opacity:.3;animation:td 1.2s ease-in-out infinite}
+.typing span:nth-child(2){animation-delay:.2s}
+.typing span:nth-child(3){animation-delay:.4s}
+@keyframes td{0%,80%,100%{opacity:.2;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
+
+/* Lights */
+.lights-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.lcard{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:16px;text-align:center;cursor:pointer;transition:all .25s;position:relative;overflow:hidden}
+.lcard.on{border-color:var(--gold)}
+.lcard.on::after{content:'';position:absolute;inset:0;background:radial-gradient(circle at 50% -20%,rgba(255,215,0,0.09),transparent 70%);pointer-events:none}
+.lcard-icon{font-size:30px;margin-bottom:6px}
+.lcard-name{font-size:10px;letter-spacing:1px;color:rgba(0,212,255,0.6)}
+.lcard-state{font-size:11px;color:var(--gold);margin-top:4px;font-family:'Orbitron',monospace;letter-spacing:2px}
+
+/* Bottom bar */
+.bottom-bar{position:fixed;bottom:0;left:0;right:0;background:rgba(2,8,16,0.98);border-top:1px solid var(--border);padding:12px 16px 22px;z-index:100;backdrop-filter:blur(10px)}
+.input-row{display:flex;gap:10px;align-items:flex-end;margin-bottom:10px}
+#tinput{flex:1;background:rgba(0,212,255,0.04);border:1px solid var(--border);border-radius:6px;color:var(--cyan);font-family:'Share Tech Mono',monospace;font-size:13px;padding:11px 14px;outline:none;resize:none;max-height:100px;transition:border-color .2s}
+#tinput:focus{border-color:var(--cyan);box-shadow:0 0 12px rgba(0,212,255,0.15)}
+#tinput::placeholder{color:rgba(0,212,255,0.2)}
+.send-btn{background:linear-gradient(135deg,rgba(0,100,255,0.3),rgba(0,212,255,0.15));border:1px solid var(--cyan);border-radius:6px;color:var(--cyan);font-size:18px;width:44px;height:44px;cursor:pointer;transition:all .2s;flex-shrink:0}
+.send-btn:active{box-shadow:0 0 18px rgba(0,212,255,0.35)}
+.mic-row{display:flex;justify-content:center}
+.mic-wrap{text-align:center}
+.mic-btn{width:60px;height:60px;border-radius:50%;border:2px solid var(--cyan);background:radial-gradient(circle,rgba(0,212,255,0.1),rgba(0,212,255,0.02));color:var(--cyan);font-size:22px;cursor:pointer;transition:all .25s;position:relative;display:flex;align-items:center;justify-content:center}
+.mic-btn::before{content:'';position:absolute;inset:-7px;border-radius:50%;border:1px solid rgba(0,212,255,0.12);animation:ring 2.5s ease-in-out infinite}
+@keyframes ring{0%,100%{transform:scale(1);opacity:.4}50%{transform:scale(1.07);opacity:.15}}
+.mic-btn.on{border-color:var(--red);color:var(--red);animation:mpulse .7s ease-in-out infinite alternate}
+@keyframes mpulse{from{box-shadow:0 0 8px rgba(255,68,68,0.3)}to{box-shadow:0 0 28px rgba(255,68,68,0.65)}}
+.mic-lbl{font-size:9px;letter-spacing:2px;color:rgba(0,212,255,0.35);margin-top:5px}
+
+/* Toast */
+.toast{position:fixed;top:68px;left:50%;transform:translateX(-50%);background:rgba(0,15,40,0.96);border:1px solid var(--cyan);border-radius:6px;padding:9px 20px;font-size:11px;letter-spacing:1px;z-index:9999;white-space:nowrap;animation:tin .25s ease;pointer-events:none}
+@keyframes tin{from{opacity:0;transform:translateX(-50%) translateY(-8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+</style>
+</head>
+<body>
+<div class="glow-bg"></div>
+
+<!-- ══ SETUP SCREEN ══ -->
+<div id="setup" class="screen active">
+<div class="setup-wrap">
+  <div class="hud-logo">
+    <h1>J.A.R.V.I.S</h1>
+    <p>JUST A RATHER VERY INTELLIGENT SYSTEM</p>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>GROQ AI ENGINE</div>
+    <div class="field">
+      <label>GROQ API KEY</label>
+      <input type="password" id="groq-key" placeholder="gsk_...">
+      <div class="hint">Free at <a href="https://console.groq.com" target="_blank">console.groq.com</a> → API Keys → Create Key</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>SPOTIFY PREMIUM</div>
+    <div class="field">
+      <label>CLIENT ID</label>
+      <input type="text" id="sp-id" placeholder="Your Spotify app client ID">
+    </div>
+    <div class="field">
+      <label>REDIRECT URI</label>
+      <input type="text" id="sp-uri" placeholder="The URL of this page">
+      <div class="hint">Create a free app at <a href="https://developer.spotify.com/dashboard" target="_blank">developer.spotify.com/dashboard</a>. Set the Redirect URI to this page's URL.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="dot"></span>GOOGLE HOME LIGHTS</div>
+    <div class="field">
+      <label>GOOGLE OAUTH CLIENT ID</label>
+      <input type="text" id="g-id" placeholder="xxxx.apps.googleusercontent.com">
+      <div class="hint">
+        1. Go to <a href="https://console.cloud.google.com" target="_blank">console.cloud.google.com</a><br>
+        2. Create a project → Enable <strong>Smart Device Management API</strong><br>
+        3. Credentials → OAuth 2.0 Client ID (Web App)<br>
+        4. Add this page URL as an Authorised redirect URI
+      </div>
+    </div>
+  </div>
+
+  <button class="btn" onclick="saveSetup()">⚡ INITIALISE JARVIS</button>
+  <button class="btn sm" onclick="demoMode()">DEMO MODE — NO KEYS NEEDED</button>
+</div>
+</div>
+
+<!-- ══ MAIN SCREEN ══ -->
+<div id="main" class="screen">
+  <div class="topbar">
+    <div class="topbar-title">J.A.R.V.I.S</div>
+    <div class="topbar-right">
+      <div class="stat-pill" id="s-ai"><span class="status-dot idle"></span>AI</div>
+      <div class="stat-pill" id="s-sp"><span class="status-dot idle"></span>SP</div>
+      <div class="stat-pill" id="s-gh"><span class="status-dot idle"></span>GH</div>
+      <button class="icon-btn" onclick="showSetup()">⚙</button>
+    </div>
+  </div>
+
+  <!-- Spotify bar -->
+  <div class="sp-bar" id="sp-bar" onclick="spBarClick()">
+    <div class="sp-art" id="sp-art">🎵</div>
+    <div class="sp-info">
+      <div class="sp-track" id="sp-track">Spotify — tap to connect</div>
+      <div class="sp-artist" id="sp-artist">Requires Spotify Premium</div>
+    </div>
+    <div class="sp-btns" onclick="event.stopPropagation()">
+      <button class="sp-btn" onclick="spCmd('previous')">⏮</button>
+      <button class="sp-btn" id="play-btn" onclick="spToggle()">▶</button>
+      <button class="sp-btn" onclick="spCmd('next')">⏭</button>
+    </div>
+  </div>
+
+  <!-- Quick commands -->
+  <div class="quick-strip">
+    <button class="qbtn" onclick="q('Turn all lights on')">💡 Lights On</button>
+    <button class="qbtn" onclick="q('Turn all lights off')">🌑 Lights Off</button>
+    <button class="qbtn" onclick="q('Set lights to red')">🔴 Red</button>
+    <button class="qbtn" onclick="q('Set lights to blue')">🔵 Blue</button>
+    <button class="qbtn" onclick="q('Set lights to warm white')">🟡 Warm</button>
+    <button class="qbtn" onclick="q('Play some music')">▶ Play</button>
+    <button class="qbtn" onclick="q('Pause the music')">⏸ Pause</button>
+    <button class="qbtn" onclick="q('What time is it?')">🕐 Time</button>
+    <button class="qbtn" onclick="q('Tell me a joke')">😄 Joke</button>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('chat',this)">CHAT</div>
+    <div class="tab" onclick="switchTab('lights',this)">LIGHTS</div>
+  </div>
+
+  <div id="tab-chat" class="tab-body active">
+    <div class="chat-area" id="chat"></div>
+  </div>
+
+  <div id="tab-lights" class="tab-body">
+    <div style="font-size:10px;letter-spacing:2px;color:rgba(0,212,255,0.45);margin-bottom:12px">SMART DEVICES</div>
+    <button class="btn green" id="gh-btn" onclick="connectGoogle()">CONNECT GOOGLE HOME</button>
+    <div class="lights-grid" id="lgrid"></div>
+  </div>
+
+  <!-- Bottom input -->
+  <div class="bottom-bar">
+    <div class="input-row">
+      <textarea id="tinput" rows="1" placeholder="Ask Jarvis anything..." onkeydown="onKey(event)" oninput="resize(this)"></textarea>
+      <button class="send-btn" onclick="send()">➤</button>
+    </div>
+    <div class="mic-row">
+      <div class="mic-wrap">
+        <button class="mic-btn" id="mic" onclick="toggleMic()">🎙</button>
+        <div class="mic-lbl" id="mic-lbl">TAP TO SPEAK</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const S = {
+  groqKey:'', spId:'', spUri:'', gId:'',
+  spToken:null, gToken:null,
+  playing:false, lights:[], demo:false,
+  listening:false, rec:null,
+  history:[]
+};
+
+// ── SETUP ──
+function saveSetup(){
+  S.groqKey = document.getElementById('groq-key').value.trim();
+  S.spId = document.getElementById('sp-id').value.trim();
+  S.spUri = document.getElementById('sp-uri').value.trim();
+  S.gId = document.getElementById('g-id').value.trim();
+  if(!S.groqKey){ toast('⚠ Enter your Groq API key'); return; }
+  localStorage.setItem('jv_groq', S.groqKey);
+  localStorage.setItem('jv_sp', S.spId);
+  localStorage.setItem('jv_su', S.spUri);
+  localStorage.setItem('jv_gi', S.gId);
+  launch();
+}
+function demoMode(){ S.demo=true; S.groqKey='demo'; launch(); addDemoLights(); }
+function showSetup(){ go('setup'); }
+function launch(){
+  go('main'); updateStats();
+  addMsg('j',"Good day. I am J.A.R.V.I.S. All systems are online. How can I assist you?");
+  initMic(); checkCallbacks();
+}
+function loadSaved(){
+  S.groqKey = localStorage.getItem('jv_groq')||'';
+  S.spId = localStorage.getItem('jv_sp')||'';
+  S.spUri = localStorage.getItem('jv_su')||'';
+  S.gId = localStorage.getItem('jv_gi')||'';
+  if(S.groqKey) document.getElementById('groq-key').value = S.groqKey;
+  if(S.spId) document.getElementById('sp-id').value = S.spId;
+  if(S.spUri) document.getElementById('sp-uri').value = S.spUri;
+  if(S.gId) document.getElementById('g-id').value = S.gId;
+}
+function go(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ── STATUS ──
+function updateStats(){
+  setStat('s-ai','AI', !!S.groqKey);
+  setStat('s-sp','SP', !!S.spToken);
+  setStat('s-gh','GH', !!S.gToken || (S.demo && S.lights.length>0));
+}
+function setStat(id,lbl,ok){
+  document.getElementById(id).innerHTML=`<span class="status-dot ${ok?'ok':'err'}"></span>${lbl}`;
+}
+
+// ── TABS ──
+function switchTab(name, el){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-body').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+}
+
+// ── CHAT ──
+function addMsg(role, text){
+  const area = document.getElementById('chat');
+  const d = document.createElement('div');
+  d.className = `msg ${role}`;
+  d.innerHTML = `<div class="msg-lbl">${role==='j'?'J.A.R.V.I.S':'YOU'}</div><div class="bubble">${text}</div>`;
+  area.appendChild(d);
+  area.scrollTop = area.scrollHeight;
+}
+function showTyping(){
+  const area = document.getElementById('chat');
+  const d = document.createElement('div');
+  d.id='typ'; d.className='msg j';
+  d.innerHTML=`<div class="msg-lbl">J.A.R.V.I.S</div><div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>`;
+  area.appendChild(d); area.scrollTop=area.scrollHeight;
+}
+function hideTyping(){ const t=document.getElementById('typ'); if(t)t.remove(); }
+
+async function send(){
+  const el = document.getElementById('tinput');
+  const text = el.value.trim();
+  if(!text) return;
+  el.value=''; el.style.height='';
+  await process(text);
+}
+function onKey(e){ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();} }
+function resize(el){ el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,100)+'px'; }
+function q(cmd){ document.getElementById('tinput').value=cmd; send(); }
+
+async function process(text){
+  addMsg('u', text);
+  showTyping();
+  const sys = `You are J.A.R.V.I.S, an intelligent AI assistant. Be concise, smart, and slightly formal like the Iron Man AI.
+The user has Govee and Calex smart lights connected via Google Home, and Spotify Premium.
+If the user asks to control lights or music, respond naturally AND append an action tag at the very end:
+For lights: ACTION:{"type":"lights","action":"on"} or "off" or {"type":"lights","action":"color","color":"red"}
+For spotify: ACTION:{"type":"spotify","action":"play"} or "pause" or "next" or "previous"
+Time: ${new Date().toLocaleTimeString()}. Date: ${new Date().toLocaleDateString()}.`;
+
+  S.history.push({role:'user',content:text});
+  let reply = '';
+
+  if(S.demo || S.groqKey==='demo'){
+    reply = demoReply(text.toLowerCase());
+  } else {
+    try {
+      const r = await fetch('https://api.groq.com/openai/v1/chat/completions',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':`Bearer ${S.groqKey}`},
+        body: JSON.stringify({
+          model:'llama3-8b-8192',
+          messages:[{role:'system',content:sys},...S.history.slice(-10)],
+          max_tokens:300, temperature:0.75
+        })
+      });
+      const d = await r.json();
+      if(d.error) throw new Error(d.error.message);
+      reply = d.choices[0].message.content;
+    } catch(e){
+      reply = `System error: ${e.message}`;
+    }
+  }
+
+  hideTyping();
+  const actionMatch = reply.match(/ACTION:(\{[^}]+\})/);
+  const clean = reply.replace(/ACTION:\{[^}]+\}/g,'').trim();
+  if(actionMatch){ try{ execAction(JSON.parse(actionMatch[1])); }catch(e){} }
+  S.history.push({role:'assistant',content:reply});
+  addMsg('j', clean);
+}
+
+function demoReply(t){
+  if(t.includes('light')&&(t.includes(' on')||t.includes('turn on'))) return "Activating all lights. ACTION:{\"type\":\"lights\",\"action\":\"on\"}";
+  if(t.includes('light')&&(t.includes(' off')||t.includes('turn off'))) return "Powering down lights. ACTION:{\"type\":\"lights\",\"action\":\"off\"}";
+  if(t.includes('red')) return "Setting lights to red. ACTION:{\"type\":\"lights\",\"action\":\"color\",\"color\":\"red\"}";
+  if(t.includes('blue')) return "Setting lights to blue. ACTION:{\"type\":\"lights\",\"action\":\"color\",\"color\":\"blue\"}";
+  if(t.includes('green')) return "Setting lights to green. ACTION:{\"type\":\"lights\",\"action\":\"color\",\"color\":\"green\"}";
+  if(t.includes('warm')) return "Setting lights to warm white. ACTION:{\"type\":\"lights\",\"action\":\"color\",\"color\":\"warm\"}";
+  if(t.includes('purple')) return "Setting lights to purple. ACTION:{\"type\":\"lights\",\"action\":\"color\",\"color\":\"purple\"}";
+  if(t.includes('play')) return "Initiating playback. ACTION:{\"type\":\"spotify\",\"action\":\"play\"}";
+  if(t.includes('pause')||t.includes('stop')) return "Pausing. ACTION:{\"type\":\"spotify\",\"action\":\"pause\"}";
+  if(t.includes('next')||t.includes('skip')) return "Skipping track. ACTION:{\"type\":\"spotify\",\"action\":\"next\"}";
+  if(t.includes('time')) return `Current time: ${new Date().toLocaleTimeString()}.`;
+  if(t.includes('date')) return `Today is ${new Date().toLocaleDateString()}.`;
+  if(t.includes('joke')) return "Why don't scientists trust atoms? Because they make up everything. Much like certain intelligence briefings.";
+  if(t.includes('hello')||t.includes('hi')) return "Hello. All systems operational. What can I do for you?";
+  if(t.includes('weather')) return "I don't have live weather access in demo mode. Connect your Groq API key for full functionality.";
+  return "Understood. I'm running in demo mode — connect your Groq API key for full AI responses. Is there anything specific I can help with?";
+}
+
+// ── ACTIONS ──
+function execAction(a){
+  if(a.type==='lights') lightAction(a);
+  else if(a.type==='spotify') spAction(a);
+}
+
+// ── LIGHTS ──
+function connectGoogle(){
+  if(S.demo){ toast('Demo mode — lights already loaded'); return; }
+  if(!S.gId){ toast('⚠ Add Google Client ID in settings'); return; }
+  const scope = encodeURIComponent('https://www.googleapis.com/auth/sdm.service');
+  const redir = encodeURIComponent(window.location.href.split('#')[0]);
+  window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${S.gId}&redirect_uri=${redir}&response_type=token&scope=${scope}`;
+}
+
+function checkCallbacks(){
+  const hash = window.location.hash;
+  if(!hash) return;
+  const p = new URLSearchParams(hash.substring(1));
+  const token = p.get('access_token');
+  const state = p.get('state');
+  if(token){
+    // Determine if Spotify or Google by checking stored state
+    const isSpotify = p.get('token_type')==='Bearer' && !state;
+    if(S.spId && !S.gToken){
+      // Try Spotify first if we have a sp client id and no google token yet
+      // Simple heuristic: spotify tokens tend to be shorter
+      S.spToken = token;
+      history.replaceState(null,'',window.location.pathname);
+      updateStats(); toast('✓ Spotify connected!');
+      pollSpotify();
+    }
+  }
+  // Check for Google token separately via a unique param
+  const gtoken = p.get('access_token');
+  if(gtoken && !S.spToken){
+    S.gToken = gtoken;
+    history.replaceState(null,'',window.location.pathname);
+    updateStats(); toast('✓ Google Home connected!');
+    loadGoogleDevices();
+  }
+}
+
+async function loadGoogleDevices(){
+  if(!S.gToken) return;
+  try {
+    const r = await fetch('https://smartdevicemanagement.googleapis.com/v1/enterprises/-/devices',{
+      headers:{'Authorization':`Bearer ${S.gToken}`}
+    });
+    const d = await r.json();
+    if(d.devices){
+      S.lights = d.devices.filter(x=>x.type?.includes('LIGHT')).map(x=>({
+        id: x.name,
+        name: x.traits?.['sdm.devices.traits.Info']?.customName || x.name.split('/').pop(),
+        on: x.traits?.['sdm.devices.traits.OnOff']?.on || false
+      }));
+      renderLights(); updateStats();
+      document.getElementById('gh-btn').style.display='none';
+    }
+  } catch(e){ toast('Could not load Google devices'); }
+}
+
+function addDemoLights(){
+  S.lights = [
+    {id:'d1',name:'Living Room',on:true},
+    {id:'d2',name:'LED Strip',on:false},
+    {id:'d3',name:'Bedroom',on:true},
+    {id:'d4',name:'Desk Light',on:false},
+  ];
+  renderLights();
+  document.getElementById('gh-btn').style.display='none';
+  updateStats();
+}
+
+function renderLights(){
+  document.getElementById('lgrid').innerHTML = S.lights.map((l,i)=>`
+    <div class="lcard ${l.on?'on':''}" onclick="toggleLight(${i})">
+      <div class="lcard-icon">${l.on?'💡':'🔦'}</div>
+      <div class="lcard-name">${l.name}</div>
+      <div class="lcard-state">${l.on?'ON':'OFF'}</div>
+    </div>`).join('');
+}
+
+async function toggleLight(i){
+  S.lights[i].on = !S.lights[i].on;
+  renderLights();
+  if(!S.demo && S.gToken) await sendGoogleCmd(S.lights[i].id, S.lights[i].on);
+  toast(`${S.lights[i].name}: ${S.lights[i].on?'ON':'OFF'}`);
+}
+
+async function sendGoogleCmd(id, on){
+  await fetch(`https://smartdevicemanagement.googleapis.com/v1/${id}:executeCommand`,{
+    method:'POST',
+    headers:{'Authorization':`Bearer ${S.gToken}`,'Content-Type':'application/json'},
+    body: JSON.stringify({command:'sdm.devices.commands.OnOff.SetOn',params:{on}})
+  });
+}
+
+function lightAction(a){
+  const colorMap = {red:'🔴',blue:'🔵',green:'🟢',warm:'🟡',purple:'🟣',white:'⚪'};
+  if(a.action==='on'){ S.lights.forEach(l=>l.on=true); toast('💡 All lights on'); }
+  else if(a.action==='off'){ S.lights.forEach(l=>l.on=false); toast('🌑 All lights off'); }
+  else if(a.action==='color'){ S.lights.forEach(l=>l.on=true); toast(`${colorMap[a.color]||'🎨'} Lights → ${a.color}`); }
+  renderLights();
+  if(!S.demo && S.gToken) S.lights.forEach(l=>sendGoogleCmd(l.id, l.on));
+}
+
+// ── SPOTIFY ──
+function spBarClick(){
+  if(!S.spToken) connectSpotify();
+}
+function connectSpotify(){
+  if(!S.spId){ toast('⚠ Add Spotify Client ID in settings'); return; }
+  const scope = encodeURIComponent('user-read-playback-state user-modify-playback-state');
+  const redir = encodeURIComponent(S.spUri || window.location.href.split('#')[0]);
+  window.location.href = `https://accounts.spotify.com/authorize?client_id=${S.spId}&redirect_uri=${redir}&response_type=token&scope=${scope}`;
+}
+
+async function pollSpotify(){
+  if(!S.spToken) return;
+  try {
+    const r = await fetch('https://api.spotify.com/v1/me/player/currently-playing',{
+      headers:{'Authorization':`Bearer ${S.spToken}`}
+    });
+    if(r.status===200){
+      const d = await r.json();
+      if(d?.item){
+        S.playing = d.is_playing;
+        document.getElementById('sp-track').textContent = d.item.name;
+        document.getElementById('sp-artist').textContent = d.item.artists.map(a=>a.name).join(', ');
+        document.getElementById('play-btn').textContent = S.playing?'⏸':'▶';
+        const img = d.item.album?.images?.[0]?.url;
+        if(img){ const a=document.getElementById('sp-art'); a.style.backgroundImage=`url(${img})`; a.textContent=''; }
+      }
+    }
+  } catch(e){}
+  setTimeout(pollSpotify,5000);
+}
+
+async function spCmd(action){
+  if(!S.spToken&&!S.demo){ connectSpotify(); return; }
+  if(S.demo){ toast(`Spotify: ${action}`); return; }
+  const ep={play:'play',pause:'pause',next:'next',previous:'previous'};
+  const mt={play:'PUT',pause:'PUT',next:'POST',previous:'POST'};
+  await fetch(`https://api.spotify.com/v1/me/player/${ep[action]}`,{
+    method:mt[action], headers:{'Authorization':`Bearer ${S.spToken}`}
+  });
+  setTimeout(pollSpotify,800);
+}
+
+async function spToggle(){
+  S.playing ? await spCmd('pause') : await spCmd('play');
+  if(!S.demo){ S.playing=!S.playing; document.getElementById('play-btn').textContent=S.playing?'⏸':'▶'; }
+}
+
+function spAction(a){
+  if(a.action==='play') spToggle();
+  else spCmd(a.action);
+}
+
+// ── MIC ──
+function initMic(){
+  const SR = window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){ document.getElementById('mic-lbl').textContent='NOT SUPPORTED'; return; }
+  const r = new SR(); r.continuous=false; r.interimResults=false; r.lang='en-US';
+  r.onresult = e => { document.getElementById('tinput').value=e.results[0][0].transcript; send(); };
+  r.onend = ()=>{ S.listening=false; document.getElementById('mic').classList.remove('on'); document.getElementById('mic-lbl').textContent='TAP TO SPEAK'; };
+  r.onerror = ()=>{ S.listening=false; document.getElementById('mic').classList.remove('on'); };
+  S.rec=r;
+}
+function toggleMic(){
+  if(!S.rec){ toast('Voice not supported on this browser'); return; }
+  if(S.listening){ S.rec.stop(); }
+  else { S.rec.start(); S.listening=true; document.getElementById('mic').classList.add('on'); document.getElementById('mic-lbl').textContent='LISTENING...'; }
+}
+
+// ── TOAST ──
+function toast(msg){
+  document.querySelectorAll('.toast').forEach(t=>t.remove());
+  const t=document.createElement('div'); t.className='toast'; t.textContent=msg;
+  document.body.appendChild(t); setTimeout(()=>t.remove(),3000);
+}
+
+// ── INIT ──
+window.onload=()=>{
+  loadSaved();
+  if(S.groqKey){ launch(); }
+  // Handle OAuth callbacks on page load
+  const hash = window.location.hash;
+  if(hash.includes('access_token')){
+    const p = new URLSearchParams(hash.substring(1));
+    const token = p.get('access_token');
+    history.replaceState(null,'',window.location.pathname);
+    if(!S.groqKey){ launch(); } // ensure main screen
+    // Try to detect which service — load saved to check
+    const savedSpId = localStorage.getItem('jv_sp');
+    const savedGId = localStorage.getItem('jv_gi');
+    // Heuristic: Google SDM tokens start with 'ya29'
+    if(token.startsWith('ya29')){ S.gToken=token; updateStats(); toast('✓ Google Home connected!'); loadGoogleDevices(); }
+    else { S.spToken=token; updateStats(); toast('✓ Spotify connected!'); pollSpotify(); }
+  }
+};
+</script>
+</body>
+</html>
